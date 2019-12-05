@@ -3,7 +3,7 @@
         <Icon type="ios-home" size="30" />
         <span>
             {{userInfo}}
-            <a @click="logout">登出</a>
+            <a v-if="$store.state.user" @click="logout">登出</a>
         </span>
     </div>
 </template>
@@ -14,8 +14,8 @@
         name: "TopBar",
         computed:{
             userInfo(){
-                console.log(store.state)
-                return "欢迎您："+store.state.user
+                if(store.state.user)
+                    return "欢迎您："+store.state.user
             }
         },
         methods:{

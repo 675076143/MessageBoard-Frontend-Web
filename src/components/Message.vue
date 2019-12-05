@@ -1,55 +1,110 @@
 <template>
     <div class="message">
-        <List class="message-list">
-            <ListItem v-for="message in messages">
-                <ListItemMeta :avatar="userImg" :title="message.poster" :description="message.comment" />
-            </ListItem>
-        </List>
+        <TopBar/>
+        <div class="list">
+            <div class="list-header">
+                <p>留言数：{{total}}</p>
+                <div class="list-header-option">
+                    <a @click="getMessageAsc">升序</a>|<a @click="getMessageDesc">降序</a>
+                </div>
+            </div>
+            <div class="list-item" v-for="message in messages">
+                <div class="list-item-content">
+                    <div class="list-item-content-title">
+                        <h2><Icon type="ios-contact" size="28"/>{{message.poster}}</h2>
+                        <span>Email: {{message.mail}}</span>
+                        <span>IP: {{message.ip}}</span>
+                    </div>
+                    <span>{{message.comment}}</span><br/>
+                    <span style="font-size: 12px;color: gray">{{message.date}}</span>
+                    <p v-if="message.reply" style="padding: 5px 10px">管理员回复：{{message.reply}}</p>
+                </div>
+                <div v-if="$store.state.user" class="list-item-action">
 
-        <ButtonGroup class="btn-page">
-            <Button class="back-page" @click="backPage" >
-                <Icon type="ios-arrow-back"></Icon>
-                Backward
-            </Button>
-            <InputNumber :max="max" :min="min" v-model="pageNum" class="pageNum" size="large" readonly></InputNumber>
-            <Button class="front-page" @click="frontPage">
-                Forward
-                <Icon type="ios-arrow-forward"></Icon>
-            </Button>
-        </ButtonGroup>
-        <Button shape="circle" type="info" class="btn-message" @click="editMessage"><Icon type="md-brush" /></Button>
-        <Modal
-                v-model="modal"
-                title="Leave your comments"
-                @on-cancel="cancel">
-            <Form ref="formValidate" :model="formValidate" :rules="ruleValidate" :label-width="80">
-                <FormItem label="Name" prop="poster">
-                    <Input v-model="formValidate.poster" placeholder="Enter your name"></Input>
-                </FormItem>
-                <FormItem label="E-mail" prop="mail">
-                    <Input v-model="formValidate.mail" placeholder="Enter your e-mail"></Input>
-                </FormItem>
-                <FormItem label="Comment" prop="comment">
-                    <Input v-model="formValidate.comment" placeholder="Enter your comment"
-                           type="textarea" :rows="4"></Input>
-                </FormItem>
+                    <Dropdown @on-click="dropDownClick($event,message)">
+                        <Button type="primary" style="margin-right: 10px">Operate</Button>
+                        <DropdownMenu slot="list" >
+                            <DropdownItem name="reply" :disabled="message.reply?true:false">Reply</DropdownItem>
+                            <DropdownItem name="edit">Edit</DropdownItem>
+                        </DropdownMenu>
 
-            </Form>
+                    </Dropdown>
+                    <Button type="error" @click="deleteComment(message.messageId)" >Delete</Button>
+                </div>
+            </div>
+        </div>
+
+        <Page class="page" :total="total" :page-size="pageSize" @on-change="onChange" />
+
+        <Modal v-model="replyModal" width="360">
+            <p slot="header" style="text-align:center">
+                Reply this comment
+            </p>
+            <div style="text-align:center">
+                <Form ref="formReply" :model="formReply" :rules="ruleReply" :label-width="80">
+                    <FormItem label="reply" prop="reply">
+                        <Input v-model="formReply.reply" placeholder="Enter your reply" type="textarea" :rows="4"></Input>
+                    </FormItem>
+                </Form>
+
+            </div>
             <div slot="footer">
-                <Button type="info" size="large" long @click="ok('formValidate')">Send Message</Button>
+                <Button type="info" size="large" long @click="sendReply('formReply')">Reply</Button>
             </div>
         </Modal>
+
+        <Modal v-model="deleteModal" width="360">
+            <p slot="header" style="color:#f60;text-align:center">
+                <Icon type="ios-information-circle"></Icon>
+                <span>Delete confirmation</span>
+            </p>
+            <div style="text-align:center">
+                <p>Will you delete it?</p>
+            </div>
+            <div slot="footer">
+                <Button type="error" size="large" long  @click="deleteConfirm">Delete</Button>
+            </div>
+        </Modal>
+
+        <Modal v-model="editModal" width="360">
+            <p slot="header" style="text-align:center">
+                Reply this comment
+            </p>
+            <div style="text-align:center">
+                <Form ref="formEdit" :model="formEdit"  :label-width="50">
+                    <FormItem label="reply" prop="reply">
+                        <Input v-model="formEdit.messageId" disabled></Input>
+                    </FormItem>
+                    <FormItem label="reply" prop="reply">
+                        <Input v-model="formEdit.comment" placeholder="Enter your comment" type="textarea" :rows="5" ></Input>
+                    </FormItem>
+                </Form>
+
+            </div>
+            <div slot="footer">
+                <Button type="info" size="large" long @click="sendEdit('formEdit')">Edit</Button>
+            </div>
+        </Modal>
+
     </div>
 </template>
 
 <script>
-    import {reqMessages, reqSendMessage} from "../api";
-    import userImg from "../assets/user_48px.png"
+    import userImg from "../assets/user_48px.png";
+    import {reqDeleteMessage, reqEditMessage, reqMessages, reqReply, reqSendMessage} from "../api";
+    import TopBar from "./TopBar";
+
     export default {
         name: "Message",
+        components: {TopBar},
         data(){
             return{
+                replyModal:false,
+                editModal:false,
+                deleteModal:false,
+                reply:'',
                 pageNum:1,
+                total:1,
                 max:10,
                 min:1,
                 messages:[],
@@ -57,113 +112,164 @@
                 pageSize:5,
                 userImg,
                 modal:false,
-                formValidate: {
-                    poster: '',
-                    mail: '',
-                    comment:''
+                formReply: {
+                    messageId:0,
+                    reply:''
                 },
-                ruleValidate: {
-                    poster: [
-                        { required: true, message: 'The name cannot be empty', trigger: 'blur' }
-                    ],
-                    mail: [
-                        { required: true, message: 'Mailbox cannot be empty', trigger: 'blur' },
-                        { type: 'email', message: 'Incorrect email format', trigger: 'blur' }
-                    ],
-                    comment: [
+                ruleReply: {
+                    reply: [
                         { required: true, message: 'The comment cannot be empty', trigger: 'change' }
                     ]
+                },
+                formEdit:{
+                    messageId:0,
+                    comment:''
                 }
             }
         },
         async mounted() {
             const {pageNum,pageSize,order} = this
             //请求数据
-            this.getMessages()
+            this.getMessages(1)
         },
         methods:{
+            dropDownClick(name,message){
+                console.log("name=>",name)
+                console.log("message=>",message)
+                if(name==="reply"){
+                    this.replyComment(message.messageId)
+                }else {
+                    this.editComment(message.messageId,message.comment)
+                }
+            },
+            messageInfo(message){
+                return 'Poster:'+message.poster+'  Email:'+message.mail+"  IP:"+message.ip
+            },
             //请求获取留言记录数据
-            async getMessages(){
-                const {pageNum,pageSize,order} = this
+            async getMessages(pageNum){
+                const {pageSize,order} = this
                 const result = await reqMessages({pageNum,pageSize,order},this)
                 if(result.code===200){
                     //将获取得到的数据付给状态值
                     this.messages=result.data.messages
                     this.max = result.data.pageNums
+                    this.total = result.data.total
                     console.log(this.messages)
                 }
             },
-            //前一页
-            async frontPage(){
-                console.log("click")
-                console.log(this.max)
-                if(this.pageNum<this.max){
-                    this.pageNum++
-                    this.getMessages()
-                }
-
+            replyComment(messageId){
+                this.replyModal = true
+                this.formReply.messageId = messageId
             },
-            //后一页
-            backPage(){
-                if(this.pageNum>this.min){
-                    this.pageNum--
-                    this.getMessages()
-                }
-
-            },
-            //编辑留言
-            editMessage(){
-                this.modal=true
-            },
-            //发送留言
-            ok (name) {
-                //表单验证
+            //发送回复
+            sendReply(name){
                 this.$refs[name].validate(async (valid) => {
                     if (valid) {
-                        const {poster,mail,comment} = this.formValidate
-                        const result = await reqSendMessage({poster,mail,comment},this)
-                        this.$Message.success('Success!');
-                        this.modal=false
-                        this.formValidate.poster=""
-                        this.formValidate.mail=""
-                        this.formValidate.comment=""
-                        this.getMessages()
+                        const {messageId,reply} = this.formReply
+                        const result = await reqReply({messageId,reply},this)
+                        if(result.code===200){
+                            this.replyModal=false
+                            this.formReply.messageId=0
+                            this.formReply.reply=""
+                            this.getMessages(1)
+                            this.$Message.success('Success!')
+                        }else {
+                            this.$Message.error("failed!")
+                        }
+
                     } else {
                         // this.$Message.error('Fail!');
                         // this.modal = true
                     }
                 })
-
             },
-            cancel () {
-                // this.$Message.info('Clicked cancel');
-                // this.modal=true
+            //删除回复
+            deleteComment(messageId){
+                this.deleteModal = true
+                this.formReply.messageId = messageId
+            },
+            //确认执行删除
+            async deleteConfirm(){
+                const {messageId} = this.formReply
+                const result = await reqDeleteMessage({messageId},this)
+                if(result.code===200){
+                    this.deleteModal=false
+                    this.formReply.messageId=0
+                    this.formReply.reply=""
+                    this.getMessages()
+                    this.$Message.success('Success!');
+                }else {
+                    this.$Message.error("failed!")
+                }
+            },
+            editComment(messageId,comment){
+                this.editModal = true
+                this.formEdit.messageId = messageId
+                this.formEdit.comment = comment
+            },
+            async sendEdit(name){
+                const {messageId,comment} = this.formEdit
+                const result = await reqEditMessage(messageId,comment,this)
+                if(result.code === 200){
+                    this.$Message.success("success!")
+                }else {
+                    this.$Message.error("failed!")
+                }
+                this.editModal = false
+                this.formEdit.messageId = 0
+                this.formEdit.comment = ""
+                this.getMessages(1)
+            },
+            onChange(page){
+                this.getMessages(page)
+            },
+            getMessageAsc(){
+                this.order="ASC"
+                this.getMessages(1)
+            },
+            getMessageDesc(){
+                this.order="DESC"
+                this.getMessages(1)
             }
         }
     }
 </script>
 
 <style scoped lang="less">
-.btn-page{
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 40px;
-    display: flex;
-
-    .front-page,.back-page,pageNum{
-        flex: 1;
-        height: 100%;
+    .page{
+        width: 100%;
+        text-align: center;
     }
-}
-.btn-message{
-    height: 49px;
-    width: 49px;
-    position: fixed;
-    bottom: 55px;
-    right: 10px;
-}
-.message-list{
-    padding: 5%;
-}
+    .list{
+        color: black;
+        padding: 59px 0px;
+        .list-header{
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .list-item{
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 10px 0;
+            border-top: solid 1px lightgray;
+            border-bottom: solid 1px lightgray;
+            &:hover{
+                transition: all 0.2s ease-in;
+                box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            .list-item-content{
+                .list-item-content-title{
+                    display: flex;
+                    align-items: center;
+                    span{
+                        margin: 10px;
+                    }
+                }
+            }
+        }
+    }
 </style>

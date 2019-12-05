@@ -51,7 +51,7 @@
                         if(result.code===200){
                             this.$Message.success(result.message)
                             await store.commit('setUser',username)
-                            await this.$router.push("/messageAdmin")
+                            await this.$router.push("/message")
                         }else {
                             this.$Message.error(result.message)
                         }

@@ -3,7 +3,6 @@ import VueRouter from 'vue-router'
 import Home from '../views/Home.vue'
 import Login from "../components/Login";
 import Message from "../components/Message";
-import MessageAdmin from "../components/MessageAdmin";
 Vue.use(VueRouter)
 
 const routes = [
@@ -21,11 +20,6 @@ const routes = [
     path:'/message',
     name:'message',
     component:Message
-  },
-  {
-    path:'/messageAdmin',
-    name:'messageAdmin',
-    component:MessageAdmin
   }
 ]
 
