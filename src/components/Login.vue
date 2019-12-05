@@ -13,6 +13,7 @@
                 </Input>
             </FormItem>
             <FormItem class="login-form-item">
+                <Checkbox v-model="remember" style="color: white">remember</Checkbox>
                 <Button class="login-btn" @click="handleSubmit('formInline')">Signin</Button>
             </FormItem>
         </Form>
@@ -22,11 +23,13 @@
 <script>
     import {reqLogin} from "../api";
     import store from '../store'
+    import storageUtils from "../utils/storageUtils";
 
     export default {
         name: "Login",
         data () {
             return {
+                remember:false,
                 formInline: {
                     username: '',
                     password: ''
@@ -51,6 +54,9 @@
                         if(result.code===200){
                             this.$Message.success(result.message)
                             await store.commit('setUser',username)
+                            if(this.remember){
+                                storageUtils.setUser({username})
+                            }
                             await this.$router.push("/message")
                         }else {
                             this.$Message.error(result.message)

@@ -24,10 +24,13 @@
 </style>
 <script>
 // @ is an alias to /src
-
+import storageUtils from "../utils/storageUtils";
+import store from '../store'
 export default {
   name: 'home',
   components: {
-  }
+
+  },
+
 }
 </script>

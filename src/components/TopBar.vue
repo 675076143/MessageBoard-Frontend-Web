@@ -10,6 +10,7 @@
 
 <script>
     import store from '../store'
+    import storageUtils from "../utils/storageUtils";
     export default {
         name: "TopBar",
         computed:{
@@ -21,6 +22,7 @@
         methods:{
             logout(){
                 store.commit('setUser','')
+                storageUtils.removeUser()
                 this.$Message.success('logout')
                 this.$router.push('/')
             }
